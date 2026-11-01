@@ -44,6 +44,7 @@ public enum L10n {
           "Sakura Switch needs Accessibility permission to list and switch other apps' windows. Grant it in System Settings; no restart required.")
     }
     public static var switcherOpenSystemSettings: String { t("打开系统设置", "Open System Settings") }
+    public static var switcherCancel: String { t("稍后再说", "Later") }
     public static var switcherScreenCaptureNeeded: String { t("开启缩略图需要屏幕录制权限", "Thumbnails need Screen Recording permission") }
 
     // MARK: - Badges
@@ -82,6 +83,7 @@ public enum L10n {
     public static var hotkeyRecording: String { t("按下新的快捷键…", "Press a new shortcut…") }
     public static var hotkeyResetDefaults: String { t("恢复默认", "Reset to Defaults") }
     public static var hotkeyConflict: String { t("注册失败：该快捷键可能已被其他应用占用", "Registration failed: this shortcut may be taken by another app") }
+    public static var hotkeyNeedsModifier: String { t("快捷键需要至少一个修饰键（⌃⌥⇧⌘）", "Shortcuts need at least one modifier (⌃⌥⇧⌘)") }
     public static var hotkeyHintRelease: String { t("按住修饰键保持面板，松开确认切换；Esc 取消", "Hold the modifier to keep the panel open, release to confirm; Esc cancels") }
 
     // Appearance
@@ -115,6 +117,7 @@ public enum L10n {
     public static var exclusionsEmpty: String { t("暂无排除项", "No exclusions yet") }
     public static var exclusionsInvalid: String { t("请输入有效的 Bundle ID（形如 com.example.app）", "Enter a valid bundle ID (like com.example.app)") }
     public static var exclusionsDuplicate: String { t("该 Bundle ID 已在列表中", "This bundle ID is already listed") }
+    public static var exclusionsRemove: String { t("移除", "Remove") }
 
     // Search settings
     public static var searchFuzzy: String { t("启用模糊搜索", "Enable fuzzy search") }
