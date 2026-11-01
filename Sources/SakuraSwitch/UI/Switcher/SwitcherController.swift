@@ -97,10 +97,18 @@ final class SwitcherController {
         positionPanel()
         installInterceptors()
         focusSearch()
+        panel.alphaValue = 0
         panel.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.12
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.allowsImplicitAnimation = true
+            panel.animator().alphaValue = 1
+        })
     }
 
     func hide() {
+        panel.alphaValue = 1
         panel.orderOut(nil)
         removeInterceptors()
         viewModel.triggerModifiers = 0
