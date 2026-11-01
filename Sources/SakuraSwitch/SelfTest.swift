@@ -15,6 +15,26 @@ enum SelfTest {
     static func run() {
         let windows = Self.syntheticWindows()
         SwitcherController.shared.showForSelfTest(windows)
+
+        // Optional scripted search: --self-test-search "vs"
+        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--self-test-search"),
+           index + 1 < ProcessInfo.processInfo.arguments.count {
+            let query = ProcessInfo.processInfo.arguments[index + 1]
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                SwitcherController.shared.setSelfTestSearch(query)
+            }
+        }
+
+        // Save a bitmap of the panel content for permission-free UI review.
+        // `--self-test-stay` keeps the app alive for interactive checks.
+        let stay = ProcessInfo.processInfo.arguments.contains("--self-test-stay")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            SwitcherController.shared.saveDebugSnapshot(to: "/tmp/sakura-selftest.png")
+            print("SELFTEST mode=\(AppContext.shared.settings.current.appearance.viewMode.rawValue)")
+            if !stay {
+                NSApp.terminate(nil)
+            }
+        }
     }
 
     static func syntheticWindows() -> [WindowModel] {

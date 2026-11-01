@@ -13,6 +13,8 @@ final class SwitcherListView: NSView {
     private var hoverTracking: [NSTrackingArea] = []
     private var lastRenderedSignature: String?
 
+    override var isFlipped: Bool { true }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
@@ -64,8 +66,10 @@ final class SwitcherListView: NSView {
                               appName: hit.window.appName,
                               icon: hit.window.appIcon,
                               selected: index == viewModel.selectedIndex,
-                              badges: badges(for: hit.window),
-                              index: index)
+                              badges: Self.badges(for: hit.window),
+                              index: index,
+                              titleMatch: hit.titleMatch,
+                              appMatch: hit.appMatch)
             contentStack.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: contentStack.widthAnchor, constant: -20).isActive = true
             rowViews.append(row)
@@ -73,7 +77,7 @@ final class SwitcherListView: NSView {
         invalidateIntrinsicContentSize()
     }
 
-    private func badges(for window: WindowModel) -> [BadgeKind] {
+    static func badges(for window: WindowModel) -> [BadgeKind] {
         var badges: [BadgeKind] = []
         if window.isMinimized { badges.append(.minimized) }
         if window.isFullscreen { badges.append(.fullscreen) }
@@ -108,7 +112,9 @@ final class SwitcherListView: NSView {
                          icon: NSImage?,
                          selected: Bool,
                          badges: [BadgeKind],
-                         index: Int) -> NSView {
+                         index: Int,
+                         titleMatch: FuzzyMatch? = nil,
+                         appMatch: FuzzyMatch? = nil) -> NSView {
         let row = NSView()
         row.wantsLayer = true
         row.layer?.cornerRadius = DS.radiusControl
@@ -123,12 +129,14 @@ final class SwitcherListView: NSView {
             iconView.heightAnchor.constraint(equalToConstant: 22),
         ])
 
-        let titleLabel = makeLabel(title, font: DS.fontBody, color: DS.textPrimary)
+        let titleLabel = NSTextField(labelWithAttributedString: MatchHighlight.attributed(
+            title, match: titleMatch, base: DS.textPrimary, font: DS.fontBody))
         titleLabel.lineBreakMode = .byTruncatingMiddle
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let appLabel = makeLabel(appName, font: DS.fontCaption, color: DS.textSecondary)
+        let appLabel = NSTextField(labelWithAttributedString: MatchHighlight.attributed(
+            appName, match: appMatch, base: DS.textSecondary, font: DS.fontCaption))
         appLabel.lineBreakMode = .byTruncatingTail
         appLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
@@ -169,6 +177,7 @@ final class SwitcherListView: NSView {
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        row.heightAnchor.constraint(equalToConstant: 36).isActive = true
         applyRowBackground(row, selected: selected)
 
         if index >= 0 {
@@ -218,7 +227,12 @@ final class SwitcherListView: NSView {
 
     override var intrinsicContentSize: NSSize {
         let count = rowViews.count
-        let height = CGFloat(count) * 36 + 20
-        return NSSize(width: 560, height: min(height, 460))
+        let height = count == 1 && rowViews.first is NSTextField ? 60 : CGFloat(count) * 38 + 20
+        return NSSize(width: 560, height: height)
+    }
+
+    /// y offset (top-down) of the row containing `index`.
+    func rowY(for index: Int) -> CGFloat {
+        10 + CGFloat(index) * 38
     }
 }
