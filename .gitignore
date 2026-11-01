@@ -1,0 +1,20 @@
+# Swift Package Manager
+.build/
+build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Xcode (this project is command-line only, keep them out anyway)
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+
+# Local task notes
+agent.txt
+
+# Build scripts output
+*.dmg
+*.zip
