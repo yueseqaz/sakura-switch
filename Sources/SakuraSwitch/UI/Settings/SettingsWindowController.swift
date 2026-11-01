@@ -113,6 +113,7 @@ final class SettingsWindowController: NSWindowController {
                               backing: .buffered, defer: false)
         window.title = L10n.settingsTitle
         window.isReleasedWhenClosed = false
+        window.isRestorable = false
         window.tabbingMode = .disallowed
         window.center()
         window.setFrameAutosaveName("SettingsWindow")

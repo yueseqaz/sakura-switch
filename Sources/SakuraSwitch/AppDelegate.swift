@@ -21,6 +21,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         rebuildStatusMenu()
         Log.switcher.info("App finished launching")
+
+        #if DEBUG
+        if SelfTest.isRequested() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                SelfTest.run()
+            }
+        }
+        #endif
     }
 
     func applicationWillTerminate(_ notification: Notification) {

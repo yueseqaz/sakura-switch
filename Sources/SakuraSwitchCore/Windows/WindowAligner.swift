@@ -10,15 +10,18 @@ public struct AXWindowSnapshot: Equatable {
     public var role: String
     public var subrole: String
     public var isMinimized: Bool
+    public var isFullscreen: Bool
 
     public init(pid: pid_t, title: String, frame: CGRect,
-                role: String = kAXWindowRole, subrole: String = "", isMinimized: Bool = false) {
+                role: String = kAXWindowRole, subrole: String = "",
+                isMinimized: Bool = false, isFullscreen: Bool = false) {
         self.pid = pid
         self.title = title
         self.frame = frame
         self.role = role
         self.subrole = subrole
         self.isMinimized = isMinimized
+        self.isFullscreen = isFullscreen
     }
 }
 

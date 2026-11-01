@@ -18,6 +18,7 @@ final class SwitcherPanel: NSPanel {
         hasShadow = true
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
+        isRestorable = false
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
         worksWhenModal = true

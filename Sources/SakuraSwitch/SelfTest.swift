@@ -1,0 +1,63 @@
+import AppKit
+import SakuraSwitchCore
+
+/// Debug-only self test: `SakuraSwitch.app/Contents/MacOS/SakuraSwitch --self-test`
+/// shows the switcher panel with synthetic windows — lets UI work proceed
+/// without an Accessibility grant. Compiled out of release builds.
+#if DEBUG
+@MainActor
+enum SelfTest {
+
+    static func isRequested() -> Bool {
+        ProcessInfo.processInfo.arguments.contains("--self-test")
+    }
+
+    static func run() {
+        let windows = Self.syntheticWindows()
+        SwitcherController.shared.showForSelfTest(windows)
+    }
+
+    static func syntheticWindows() -> [WindowModel] {
+        let iconTerminal = NSWorkspace.shared.icon(forFile: "/System/Applications/Utilities/Terminal.app")
+        let iconSafari = NSWorkspace.shared.icon(forFile: "/System/Applications/Safari.app")
+        let iconNotes = NSWorkspace.shared.icon(forFile: "/System/Applications/Notes.app")
+        let iconCode = NSWorkspace.shared.icon(forFile: "/Applications/Visual Studio Code.app")
+        let iconFinder = NSWorkspace.shared.icon(forFile: "/System/Library/CoreServices/Finder.app")
+
+        var now = Date()
+        func stamp() -> Date { now = now.addingTimeInterval(-60); return now }
+        let specs: [(String, String, NSImage, Bool, Bool, Bool, String)] = [
+            // title, app, icon, minimized, fullscreen, onScreen, bundleID
+            ("main.swift — SakuraSwitch", "Visual Studio Code", iconCode, false, false, true, "com.microsoft.VSCode"),
+            ("Apple", "Safari", iconSafari, false, false, true, "com.apple.Safari"),
+            ("首页 — Macintosh HD", "Finder", iconFinder, false, false, true, "com.apple.finder"),
+            ("购物清单", "Notes", iconNotes, true, false, false, "com.apple.Notes"),
+            ("终端 — zsh", "Terminal", iconTerminal, false, false, true, "com.apple.Terminal"),
+            ("Design Review", "Visual Studio Code", iconCode, false, false, false, "com.microsoft.VSCode"),
+            ("Sakura Switch — README.md", "Visual Studio Code", iconCode, false, false, true, "com.microsoft.VSCode"),
+        ]
+
+        var models: [WindowModel] = []
+        for (index, spec) in specs.enumerated() {
+            let (title, app, icon, minimized, fullscreen, onScreen, bundleID) = spec
+            models.append(WindowModel(
+                windowID: CGWindowID(1000 + index),
+                pid: pid_t(100 + index),
+                appName: app,
+                bundleID: bundleID,
+                windowTitle: title,
+                appIcon: icon,
+                frame: CGRect(x: 100 * index, y: 100, width: 1200, height: 800),
+                isMinimized: minimized,
+                isFullscreen: fullscreen,
+                isOnScreen: onScreen,
+                screenID: 1,
+                lastUsedAt: stamp(),
+                axElement: nil,
+                isExcluded: false
+            ))
+        }
+        return models
+    }
+}
+#endif
