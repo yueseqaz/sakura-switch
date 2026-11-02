@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-02
+
+### Fixed
+
+- macOS 26/27 (Tahoe) TCC guidance: the menu bar now always shows the
+  Accessibility permission state, with a one-click fix entry when the grant
+  is missing or stale (the known Tahoe bug where the switch reads ON while
+  `AXIsProcessTrusted()` still returns false).
+- The permission hint panel now appears automatically at launch when no
+  valid Accessibility grant is detected, instead of waiting for a silent
+  hotkey press.
+- Documentation: Tahoe troubleshooting steps (remove entry → reboot →
+  re-add; `sudo tccutil reset Accessibility`) in README and the manual test
+  checklist.
+
 ## [1.0.0] - 2026-11-02
 
 ### Added
@@ -39,5 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - XCTest unit tests for MRU ordering, fuzzy matching, search memory, WCAG
   contrast, exclusion filtering, window dedup and settings persistence.
 
-[Unreleased]: https://github.com/yueseqaz/sakura-switch/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/yueseqaz/sakura-switch/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/yueseqaz/sakura-switch/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/yueseqaz/sakura-switch/releases/tag/v1.0.0

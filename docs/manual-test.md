@@ -24,6 +24,10 @@ release. Build: `bash scripts/build-app.sh <version>` then open the app.
       *稍后再说* dismisses; Esc/Return dismiss.
 - [ ] After granting Accessibility, the switcher works **without
       restarting the app** (permission is re-checked on every invocation).
+- [ ] **macOS 26/27 (Tahoe)**: if the toggle is ON but the menu bar still
+      shows the ⚠️ item, remove the entry with −, reboot, re-add and
+      re-enable; optionally `sudo tccutil reset Accessibility`. The menu bar
+      item must disappear once the grant is truly active.
 - [ ] Settings → 权限 shows live status for both permissions; 重新检测
       updates in place; the unsigned-app note is visible.
 

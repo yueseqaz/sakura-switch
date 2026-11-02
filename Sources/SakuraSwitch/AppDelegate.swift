@@ -31,6 +31,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         #endif
+
+        // First-launch guidance: if Accessibility is missing (or a known
+        // macOS Tahoe stale-TCC case), surface the fix immediately instead
+        // of waiting for a silent hotkey.
+        if !AccessibilityPermission.isGranted {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.showStartupHint()
+            }
+        }
+    }
+
+    private var startupHintShown = false
+
+    /// Show the permission hint once per launch (never repeatedly).
+    private func showStartupHint() {
+        guard !startupHintShown, !AccessibilityPermission.isGranted else { return }
+        startupHintShown = true
+        SwitcherController.shared.showPermissionHint()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -46,6 +64,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.statusItem = statusItem
 
         let menu = NSMenu()
+
+        // Accessibility status is always visible in the menu: not
+        // hover-only, not color-only, with a direct fix action when missing.
+        let axGranted = AccessibilityPermission.isGranted
+        if !axGranted {
+            let warnItem = NSMenuItem(title: L10n.menuAccessibilityMissing,
+                                      action: #selector(openAccessibilitySettings(_:)), keyEquivalent: "")
+            warnItem.target = self
+            menu.addItem(warnItem)
+            menu.addItem(.separator())
+        }
 
         let switchItem = NSMenuItem(title: L10n.menuOpenSwitcher,
                                     action: #selector(openSwitcher(_:)), keyEquivalent: "")
@@ -88,6 +117,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSwitcher(_ sender: Any?) {
         SwitcherController.shared.toggleGlobal()
+    }
+
+    @objc private func openAccessibilitySettings(_ sender: Any?) {
+        AccessibilityPermission.openSystemSettings()
     }
 
     @objc private func openSettings(_ sender: Any?) {

@@ -81,6 +81,21 @@ This is expected for all unsigned open-source apps. You can also build it yourse
 > The same applies after replacing the binary with a different build.
 > Sakura Switch re-checks the permission every time it is invoked, so no restart is needed.
 
+#### macOS 26/27 (Tahoe): switch is ON but the app still can't use it
+
+A widespread Tahoe bug makes the Accessibility toggle appear ON while
+`AXIsProcessTrusted()` still reports *not granted* (and the switch sometimes
+flips back off by itself). If the menu bar shows
+**⚠️ 辅助功能权限未生效 — 点击修复** even though the switch looks enabled:
+
+1. In the permissions list, **remove Sakura Switch with the − button**
+   (toggling the switch alone is *not enough*).
+2. **Restart your Mac** (clears the corrupted TCC record).
+3. Open Sakura Switch, press `⌥Tab` once and follow the hint panel, or add
+   the app manually, then re-enable the switch.
+4. Still stuck? Reset the whole service and re-grant:
+   `sudo tccutil reset Accessibility`
+
 ## Build from Source
 
 Requirements: macOS 13+, Xcode Command Line Tools (`xcode-select --install`), Swift 5.9+.

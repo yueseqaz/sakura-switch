@@ -107,6 +107,12 @@ final class SwitcherController {
         })
     }
 
+    /// Startup permission guidance (visible even without touching the hotkey).
+    func showPermissionHint() {
+        guard !panel.isVisible else { return }
+        hintPanel.show()
+    }
+
     func hide() {
         panel.alphaValue = 1
         panel.orderOut(nil)

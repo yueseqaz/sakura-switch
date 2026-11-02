@@ -32,6 +32,9 @@ public enum L10n {
     public static var menuAbout: String { t("关于 Sakura Switch", "About Sakura Switch") }
     public static var menuQuit: String { t("退出 Sakura Switch", "Quit Sakura Switch") }
     public static var menuCheckAccessibility: String { t("授予辅助功能权限…", "Grant Accessibility Permission…") }
+    public static var menuAccessibilityMissing: String { t("⚠️ 辅助功能权限未生效 — 点击修复", "⚠️ Accessibility Permission Not Active — Fix") }
+    public static var menuAccessibilityGranted: String { t("辅助功能权限：已授权", "Accessibility Permission: Granted") }
+    public static var hintShowOnLaunch: String { t("未检测到有效的辅助功能授权，切换器无法列出窗口。", "No valid Accessibility grant detected — the switcher cannot list windows.") }
 
     // MARK: - Switcher
 
