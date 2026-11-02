@@ -5,7 +5,8 @@
 #   version defaults to the contents of the VERSION file, or 0.0.0-dev.
 #   build-number defaults to a timestamp.
 #
-# No code signing is performed anywhere in this script.
+# CODE_SIGN_IDENTITY defaults to ad-hoc signing (-). Set it to a persistent
+# signing identity to preserve TCC grants across rebuilds.
 
 set -euo pipefail
 
@@ -33,6 +34,20 @@ APP_NAME="Sakura Switch"
 EXECUTABLE_NAME="SakuraSwitch"
 APP_DIR="build/SakuraSwitch.app"
 
+ensure_app_is_not_running() {
+  local pid running_path
+  while IFS= read -r pid; do
+    running_path="$(ps -p "$pid" -o comm= 2>/dev/null || true)"
+    if [[ "$running_path" == "$ROOT_DIR/$APP_DIR/Contents/MacOS/$EXECUTABLE_NAME" ]]; then
+      echo "error: $APP_NAME is running from $APP_DIR (PID $pid)." >&2
+      echo "Quit that app before packaging. Replacing a running app invalidates its code identity and can break TCC permission checks." >&2
+      exit 1
+    fi
+  done < <(pgrep -x "$EXECUTABLE_NAME" || true)
+}
+
+ensure_app_is_not_running
+
 echo "==> Building $APP_NAME $VERSION (build $BUILD_NUMBER)"
 
 # ------------------------------------------------------------------ build ----
@@ -40,15 +55,12 @@ echo "==> Building $APP_NAME $VERSION (build $BUILD_NUMBER)"
 UNIVERSAL_ARGS=(--arch arm64 --arch x86_64)
 BIN_PATH=""
 if swift build -c release "${UNIVERSAL_ARGS[@]}"; then
-  # SwiftPM puts multi-arch products under .build/apple/.
-  for candidate in .build/apple/Products/Release/SakuraSwitch .build/release/SakuraSwitch; do
-    if [[ -f "$candidate" ]]; then BIN_PATH="$candidate"; break; fi
-  done
+  BIN_PATH="$(swift build -c release "${UNIVERSAL_ARGS[@]}" --show-bin-path)/SakuraSwitch"
   echo "==> Universal binary (arm64 + x86_64)"
 else
   echo "==> Universal build failed, falling back to host architecture" >&2
   swift build -c release
-  BIN_PATH=".build/release/SakuraSwitch"
+  BIN_PATH="$(swift build -c release --show-bin-path)/SakuraSwitch"
 fi
 
 if [[ -z "$BIN_PATH" || ! -f "$BIN_PATH" ]]; then
@@ -57,6 +69,8 @@ if [[ -z "$BIN_PATH" || ! -f "$BIN_PATH" ]]; then
 fi
 
 # ----------------------------------------------------------------- bundle ----
+# The user may have launched the app while compilation was in progress.
+ensure_app_is_not_running
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
@@ -107,6 +121,12 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 PLIST
 
 plutil -lint "$APP_DIR/Contents/Info.plist" >/dev/null
+
+# The linker's signature covers only the executable, not the assembled app.
+# TCC needs a valid bundle signature that binds its identifier and Info.plist.
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
+codesign --force --sign "$CODE_SIGN_IDENTITY" --identifier "$BUNDLE_ID" "$APP_DIR"
+codesign --verify --strict --all-architectures --verbose=2 "$APP_DIR"
 
 echo "==> Built $APP_DIR"
 file "$APP_DIR/Contents/MacOS/$EXECUTABLE_NAME"

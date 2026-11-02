@@ -46,6 +46,10 @@ public enum L10n {
     public static var switcherOpenSystemSettings: String { t("打开系统设置", "Open System Settings") }
     public static var switcherCancel: String { t("稍后再说", "Later") }
     public static var switcherScreenCaptureNeeded: String { t("开启缩略图需要屏幕录制权限", "Thumbnails need Screen Recording permission") }
+    public static var switcherAllWindows: String { t("全部窗口", "All windows") }
+    public static var switcherPreviewLoading: String { t("正在加载预览…", "Loading preview…") }
+    public static var switcherPreviewUnavailable: String { t("此窗口暂不可预览", "Preview unavailable") }
+    public static func switcherWindowCount(_ count: Int) -> String { t("\(count) 个窗口", "\(count) windows") }
 
     // MARK: - Badges
 
@@ -84,7 +88,10 @@ public enum L10n {
     public static var hotkeyResetDefaults: String { t("恢复默认", "Reset to Defaults") }
     public static var hotkeyConflict: String { t("注册失败：该快捷键可能已被其他应用占用", "Registration failed: this shortcut may be taken by another app") }
     public static var hotkeyNeedsModifier: String { t("快捷键需要至少一个修饰键（⌃⌥⇧⌘）", "Shortcuts need at least one modifier (⌃⌥⇧⌘)") }
-    public static var hotkeyHintRelease: String { t("按住修饰键保持面板，松开确认切换；Esc 取消", "Hold the modifier to keep the panel open, release to confirm; Esc cancels") }
+    public static var hotkeyHintRelease: String { t("按住修饰键保持面板；可选择松开后的行为，Esc 取消", "Hold the modifier to keep the panel open; choose what happens on release. Esc cancels") }
+    public static var hotkeyReleaseBehavior: String { t("松开修饰键时", "When the modifier is released") }
+    public static var hotkeyReleaseSwitchAndClose: String { t("切换并关闭面板", "Switch and close panel") }
+    public static var hotkeyReleaseKeepOpen: String { t("保留面板打开", "Keep panel open") }
 
     // Appearance
     public static var appearanceViewMode: String { t("视图模式", "View Mode") }
@@ -137,15 +144,15 @@ public enum L10n {
     public static var permissionRecheck: String { t("重新检测", "Recheck") }
     public static var permissionOpenSettings: String { t("打开系统设置", "Open System Settings") }
     public static var permissionUnsignedNote: String {
-        t("提示：本应用未签名。重新编译或移动 App 位置后，macOS 可能要求在「隐私与安全性 → 辅助功能」中重新勾选 Sakura Switch。",
-          "Note: this app is unsigned. After recompiling or moving the app, macOS may require re-granting Accessibility under Privacy & Security.")
+        t("提示：更新或重新编译后，如授权不生效，请退出应用，在系统设置中移除旧条目，再重新添加当前 App。屏幕录制授权后可能需要重启应用。",
+          "If permission stops working after an update or rebuild, quit the app, remove its old entry in System Settings, then add the current app again. Screen Recording may require an app restart.")
     }
 
     // About
     public static var aboutVersion: String { t("版本", "Version") }
     public static var aboutGitHub: String { t("GitHub 项目主页", "GitHub Project") }
     public static var aboutLicense: String { t("MIT License", "MIT License") }
-    public static var aboutBuildNote: String { t("本应用使用 Swift Package Manager 从命令行构建，未经签名与公证。", "Built from the command line with Swift Package Manager; unsigned and un-notarized.") }
+    public static var aboutBuildNote: String { t("本应用使用 Swift Package Manager 从命令行构建，未经 Apple 公证。", "Built from the command line with Swift Package Manager; not notarized by Apple.") }
     public static var aboutCopyright: String { t("以 MIT 许可证开源发布", "Released as open source under the MIT license") }
 
     // Quick actions (shown as key hints)

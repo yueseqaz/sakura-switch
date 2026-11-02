@@ -29,7 +29,7 @@ final class PermissionHintPanel {
         body.preferredMaxLayoutWidth = 320
 
         let openButton = DSButton(L10n.switcherOpenSystemSettings, kind: .accent) { [weak self] in
-            AccessibilityPermission.openSystemSettings()
+            AccessibilityPermission.requestAndOpenSystemSettings()
             self?.hide()
         }
         let laterButton = DSButton(L10n.switcherCancel) { [weak self] in

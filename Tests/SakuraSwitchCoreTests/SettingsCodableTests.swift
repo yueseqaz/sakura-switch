@@ -32,6 +32,19 @@ struct SettingsCodableTests {
         #expect(defaults.globalSwitch.modifiers == KeyCombo.option)
         #expect(defaults.inAppSwitch.keyCode == UInt32(kVK_ANSI_Grave))
         #expect(defaults.inAppSwitch.modifiers == KeyCombo.option)
+        #expect(defaults.releaseBehavior == .switchAndClose)
+    }
+
+    @Test("Release behavior persists and old settings default to closing")
+    func releaseBehaviorRoundTrip() throws {
+        let settings = AppSettings(hotkeys: AppSettings.Hotkeys(releaseBehavior: .keepOpen))
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: data)
+        #expect(decoded.hotkeys.releaseBehavior == .keepOpen)
+
+        let oldData = Data("{\"hotkeys\":{}}".utf8)
+        let old = try JSONDecoder().decode(AppSettings.self, from: oldData)
+        #expect(old.hotkeys.releaseBehavior == .switchAndClose)
     }
 
     @Test("KeyCombo display strings")

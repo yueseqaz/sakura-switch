@@ -3,7 +3,8 @@
 #
 # Usage: bash scripts/package-dmg.sh [version] [build-number]
 #
-# No code signing, notarization or stapling is performed anywhere.
+# App signing is handled by build-app.sh. No DMG signing, notarization or
+# stapling is performed here.
 
 set -euo pipefail
 

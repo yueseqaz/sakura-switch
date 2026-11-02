@@ -4,8 +4,9 @@ Behaviors that cannot be covered by unit tests (Accessibility, Screen
 Recording, global keyboard interaction). Run through this list before a
 release. Build: `bash scripts/build-app.sh <version>` then open the app.
 
-> Unsigned-app reminder: after recompiling, macOS may require re-granting
-> **System Settings → Privacy & Security → Accessibility**.
+> Ad-hoc signing reminder: after recompiling, macOS may require removing the old
+> permission entry and adding the installed app again under
+> **System Settings → Privacy & Security → Accessibility** (or **Device Control & Data Access**).
 
 ## 1. Launch & menu bar
 
@@ -19,13 +20,22 @@ release. Build: `bash scripts/build-app.sh <version>` then open the app.
 
 ## 2. Permissions
 
+- [ ] `codesign --verify --strict --all-architectures build/SakuraSwitch.app`
+      succeeds; `codesign -dv build/SakuraSwitch.app` reports the bundle identifier
+      `com.yueseqaz.sakuraswitch` and a bound Info.plist.
 - [ ] With Accessibility **not** granted: pressing the global hotkey shows
-      the frosted hint panel; *打开系统设置* opens the Accessibility pane;
+      the frosted hint panel; *打开系统设置* requests permission for the running app
+      and opens System Settings;
       *稍后再说* dismisses; Esc/Return dismiss.
 - [ ] After granting Accessibility, the switcher works **without
       restarting the app** (permission is re-checked on every invocation).
 - [ ] Settings → 权限 shows live status for both permissions; 重新检测
-      updates in place; the unsigned-app note is visible.
+      updates in place; returning from System Settings refreshes automatically.
+- [ ] Revoking Accessibility while the permissions tab is visible changes its
+      status to 未授权; the next switcher invocation shows the hint.
+- [ ] The Screen Recording button triggers the native permission request on a
+      clean install; returning to Settings updates its status (restart if macOS
+      requires it). Opening Settings alone does not request Screen Recording.
 
 ## 3. Global hotkey (default ⌥Tab)
 
@@ -33,6 +43,16 @@ release. Build: `bash scripts/build-app.sh <version>` then open the app.
       mouse.
 - [ ] Selection starts at the second MRU entry (cmd-tab style).
 - [ ] Tapping ⌥Tab again cycles forward; ⇧⌥Tab cycles backward.
+- [ ] Keep Option physically held and press/release Tab at least five times:
+      one window per press, wrapping at the end, without hiding the panel.
+      Option+arrows, Option+Enter and Option+Esc also work while Option stays held.
+- [ ] On the first invocation after launch, a quick Option+Tab release still
+      activates the second MRU window once enumeration finishes.
+- [ ] Settings → Hotkeys → 松开修饰键时: “切换并关闭面板” keeps the current
+      behavior; “保留面板打开” leaves the selected window and panel visible after
+      Option is released. Enter or clicking a window still confirms and closes it.
+- [ ] Open Switcher from the menu: pressing/releasing Option alone does not
+      confirm or dismiss it; Tab and Shift+Tab still browse.
 - [ ] Releasing ⌥ confirms the highlighted window (unminimizes, activates,
       raises, focuses).
 - [ ] Esc cancels; clicking outside the panel dismisses.
@@ -46,9 +66,36 @@ release. Build: `bash scripts/build-app.sh <version>` then open the app.
 
 ## 5. View modes (Settings → 外观)
 
+- [ ] The application strip shows one icon per application with its window count.
+      Hover an app for about 180 ms: the grid shows only that app's windows as
+      thumbnails, including multiple windows of the same app.
+- [ ] Moving from the app icon into its window previews keeps that group open;
+      click a preview to activate that exact window. All Windows or Esc returns
+      to the full list. Moving quickly across icons does not open stale groups.
+- [ ] Select a thumbnail with Tab or Shift+Tab and stop for about half a second:
+      a much larger preview appears without moving the grid or stealing keyboard
+      focus. Press Tab again or dismiss the switcher: the preview closes.
+      The mouse can remain anywhere; moving it does not control the preview.
+- [ ] Move quickly between thumbnails, change app groups and scroll: no stale
+      enlarged preview remains. A preview at a screen edge stays within that
+      screen's visible area; without recording permission it shows a clear hint.
+- [ ] Hovering another app keeps the icon strip under the pointer, even when
+      the preview grid changes height. Overflowing app icons scroll horizontally;
+      overflowing window previews scroll vertically.
+- [ ] Without Screen Recording permission the switcher shows a permission action
+      and explicit placeholders. Clicking the action requests permission; granting
+      it and reopening retries captures for the same windows.
+- [ ] Starting with an empty window cache, opening the switcher fills the visible
+      grid as soon as background enumeration completes without a second invocation.
+- [ ] Run `swift run SakuraSwitch --self-test --self-test-live` with both permissions
+      granted. Its output reports real windows and a nonzero `thumbnails` count;
+      `--self-test-app com.apple.finder` scopes this check to Finder's windows.
 - [ ] 缩略图: live window thumbnails; without Screen Recording permission
       the app icon shows as an inset placeholder; granting permission and
       re-invoking shows captures.
+- [ ] Thumbnail cards preserve each source window's aspect ratio: a portrait
+      window is taller and a wide window is shorter at the same card width;
+      captures are requested using that ratio rather than one fixed height.
 - [ ] 应用图标: icon grid, truncating titles, selection ring.
 - [ ] 标题列表: compact rows, hover selects, click switches.
 - [ ] Switching modes applies immediately on the next invocation; panel

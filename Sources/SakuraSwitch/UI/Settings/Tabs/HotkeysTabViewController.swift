@@ -147,10 +147,22 @@ final class HotkeysTabViewController: SettingsTabViewController {
 
         let hint = DSForm.note(L10n.hotkeyHintRelease, tone: .info)
 
+        let releaseBehavior = context.settings.current.hotkeys.releaseBehavior
+        let releaseOptions = AppSettings.Hotkeys.ReleaseBehavior.allCases
+        let releaseControl = ClosureSegmented(labels: [L10n.hotkeyReleaseSwitchAndClose, L10n.hotkeyReleaseKeepOpen],
+                                              selectedIndex: releaseOptions.firstIndex(of: releaseBehavior) ?? 0) { index in
+            guard releaseOptions.indices.contains(index) else { return }
+            context.settings.update { $0.hotkeys.releaseBehavior = releaseOptions[index] }
+        }
+        releaseControl.setAccessibilityLabel(L10n.hotkeyReleaseBehavior)
+        releaseControl.widthAnchor.constraint(equalToConstant: 250).isActive = true
+        let releaseRow = DSForm.row(title: L10n.hotkeyReleaseBehavior, control: releaseControl)
+
         let resetButton = DSButton(L10n.hotkeyResetDefaults) {
             context.settings.resetHotkeysToDefaults()
             globalRecorder.update(combo: context.settings.current.hotkeys.globalSwitch)
             inAppRecorder.update(combo: context.settings.current.hotkeys.inAppSwitch)
+            releaseControl.selectedSegment = releaseOptions.firstIndex(of: context.settings.current.hotkeys.releaseBehavior) ?? 0
             globalError.isHidden = !coordinator.isFailed(HotkeyCoordinator.globalID)
             inAppError.isHidden = !coordinator.isFailed(HotkeyCoordinator.inAppID)
         }
@@ -158,7 +170,7 @@ final class HotkeysTabViewController: SettingsTabViewController {
 
         return [
             makeLabel(L10n.tabHotkeys, font: DS.fontTitle, color: DS.textPrimary),
-            DSForm.card(rows: [globalRow, DSForm.divider(), inAppRow]),
+            DSForm.card(rows: [globalRow, DSForm.divider(), inAppRow, DSForm.divider(), releaseRow]),
             hint,
             resetRow,
         ]
