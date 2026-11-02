@@ -13,8 +13,32 @@ enum SelfTest {
     }
 
     static func run() {
-        let windows = Self.syntheticWindows()
+        setbuf(stdout, nil)
+        if ProcessInfo.processInfo.arguments.contains("--self-test-live") {
+            print("SELFTEST accessibility=\(AccessibilityPermission.isGranted) screenRecording=\(ScreenCapturePermission.isGranted)")
+            DispatchQueue.global(qos: .userInitiated).async {
+                let windows = WindowEnumerator().enumerate(exclusions: Set(AppSettings.defaultExclusions))
+                DispatchQueue.main.async { render(windows: windows) }
+            }
+        } else {
+            render(windows: syntheticWindows())
+        }
+    }
+
+    private static func render(windows: [WindowModel]) {
         SwitcherController.shared.showForSelfTest(windows)
+        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--self-test-app"),
+           index + 1 < ProcessInfo.processInfo.arguments.count {
+            SwitcherController.shared.setSelfTestApplication(ProcessInfo.processInfo.arguments[index + 1])
+        }
+        if ProcessInfo.processInfo.arguments.contains("--self-test-interactions") {
+            SwitcherController.shared.checkSelfTestNavigation()
+        }
+        if ProcessInfo.processInfo.arguments.contains("--self-test-selection-preview") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                SwitcherController.shared.setSelfTestSelectionPreview(0)
+            }
+        }
 
         // Optional scripted search: --self-test-search "vs"
         if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--self-test-search"),
@@ -28,7 +52,11 @@ enum SelfTest {
         // Save a bitmap of the panel content for permission-free UI review.
         // `--self-test-stay` keeps the app alive for interactive checks.
         let stay = ProcessInfo.processInfo.arguments.contains("--self-test-stay")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        let captureDelay: TimeInterval = ProcessInfo.processInfo.arguments.contains("--self-test-live") ? 10 : 2.5
+        DispatchQueue.main.asyncAfter(deadline: .now() + captureDelay) {
+            if ProcessInfo.processInfo.arguments.contains("--self-test-selection-preview") {
+                SwitcherController.shared.saveSelfTestSelectionPreviewSnapshot()
+            }
             SwitcherController.shared.saveDebugSnapshot(to: "/tmp/sakura-selftest.png")
             print("SELFTEST mode=\(AppContext.shared.settings.current.appearance.viewMode.rawValue)")
             if !stay {
@@ -67,7 +95,9 @@ enum SelfTest {
                 bundleID: bundleID,
                 windowTitle: title,
                 appIcon: icon,
-                frame: CGRect(x: 100 * index, y: 100, width: 1200, height: 800),
+                frame: CGRect(x: 100 * index, y: 100,
+                              width: [1200, 700, 1800, 900, 1200, 1500, 800][index],
+                              height: [800, 1100, 700, 1400, 800, 900, 1200][index]),
                 isMinimized: minimized,
                 isFullscreen: fullscreen,
                 isOnScreen: onScreen,

@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to build (e.g. 1.0.0)"
+        description: "Version to build (e.g. 1.1.0)"
         required: true
-        default: "1.0.0"
+        default: "1.1.0"
 
 permissions:
   contents: write
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   release:
-    name: Unsigned DMG + ZIP → GitHub Release
+    name: Signed app in DMG + ZIP → GitHub Release
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -44,8 +44,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-swiftpm-release-
 
-      - name: Package DMG + ZIP (unsigned)
+      - name: Package DMG + ZIP (ad-hoc signed app)
         run: bash scripts/package-dmg.sh "${{ steps.version.outputs.version }}"
+
+      - name: Verify release app
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          test "$(cat VERSION)" = "$RELEASE_VERSION"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/SakuraSwitch.app/Contents/Info.plist)" = "$RELEASE_VERSION"
+          codesign --verify --strict --all-architectures build/SakuraSwitch.app
+          lipo build/SakuraSwitch.app/Contents/MacOS/SakuraSwitch -verify_arch arm64 x86_64
 
       - name: Extract release notes from CHANGELOG
         id: notes
@@ -58,7 +67,7 @@ jobs:
           ' CHANGELOG.md > release-notes.md
           if [[ ! -s release-notes.md ]]; then
             echo "No changelog section for $VERSION — using a fallback note." >&2
-            printf 'Sakura Switch %s — unsigned build.\n\nSee CHANGELOG.md for details.\n' "$VERSION" > release-notes.md
+            printf 'Sakura Switch %s — ad-hoc signed app, without notarization.\n\nSee CHANGELOG.md for details.\n' "$VERSION" > release-notes.md
           fi
           cat release-notes.md
 

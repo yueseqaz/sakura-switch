@@ -1,7 +1,6 @@
 import AppKit
 import ApplicationServices
 import CoreGraphics
-import SakuraSwitchCore
 
 /// Enumerates switchable windows of all regular apps via the Accessibility
 /// API, aligned with CGWindowList data for window IDs and screen assignment.
@@ -10,7 +9,7 @@ import SakuraSwitchCore
 /// Swift, but their string values are stable API.
 enum CGWindowKey {
     static let number = "kCGWindowNumber"
-    static let pid = "kCGWindowPID"
+    static let ownerPID = "kCGWindowOwnerPID"
     static let bounds = "kCGWindowBounds"
     static let layer = "kCGWindowLayer"
     static let isOnscreen = "kCGWindowIsOnscreen"
@@ -40,27 +39,24 @@ public final class WindowEnumerator {
         guard let raw = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             return []
         }
-        var snapshots: [CGWindowSnapshot] = []
-        snapshots.reserveCapacity(raw.count)
-        for info in raw {
-            guard let pidNumber = info[CGWindowKey.pid] as? NSNumber,
-                  let boundsAny = info[CGWindowKey.bounds],
-                  CFGetTypeID(boundsAny as CFTypeRef) == CFDictionaryGetTypeID() else { continue }
-            var bounds = CGRect.zero
-            CGRectMakeWithDictionaryRepresentation(unsafeDowncast(boundsAny as CFTypeRef, to: CFDictionary.self), &bounds)
-            let layer = (info[CGWindowKey.layer] as? NSNumber)?.intValue ?? 0
-            let isOnScreen = (info[CGWindowKey.isOnscreen] as? NSNumber)?.boolValue ?? false
-            let windowID = (info[CGWindowKey.number] as? NSNumber)?.uint32Value ?? 0
-            // kCGWindowName is only present with Screen Recording permission.
-            let title = info[CGWindowKey.name] as? String
-            snapshots.append(CGWindowSnapshot(windowID: windowID,
-                                              pid: pid_t(pidNumber.int32Value),
-                                              frame: bounds,
-                                              layer: layer,
-                                              isOnScreen: isOnScreen,
-                                              title: title))
-        }
-        return snapshots
+        return raw.compactMap(cgWindowSnapshot(from:))
+    }
+
+    /// Decode the public CGWindowList dictionary without depending on a live desktop.
+    public static func cgWindowSnapshot(from info: [String: Any]) -> CGWindowSnapshot? {
+        guard let pidNumber = info[CGWindowKey.ownerPID] as? NSNumber,
+              let idNumber = info[CGWindowKey.number] as? NSNumber,
+              idNumber.uint32Value != kCGNullWindowID,
+              let boundsAny = info[CGWindowKey.bounds],
+              CFGetTypeID(boundsAny as CFTypeRef) == CFDictionaryGetTypeID() else { return nil }
+        var bounds = CGRect.zero
+        guard CGRectMakeWithDictionaryRepresentation(unsafeDowncast(boundsAny as CFTypeRef, to: CFDictionary.self), &bounds) else { return nil }
+        return CGWindowSnapshot(windowID: idNumber.uint32Value,
+                                pid: pid_t(pidNumber.int32Value),
+                                frame: bounds,
+                                layer: (info[CGWindowKey.layer] as? NSNumber)?.intValue ?? 0,
+                                isOnScreen: (info[CGWindowKey.isOnscreen] as? NSNumber)?.boolValue ?? false,
+                                title: info[CGWindowKey.name] as? String)
     }
 
     // MARK: - Enumeration

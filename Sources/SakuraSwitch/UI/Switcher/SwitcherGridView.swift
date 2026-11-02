@@ -24,6 +24,14 @@ final class SwitcherGridView: NSView {
     private var currentSelection = -1
     private var lastSignature: String = ""
     private var hoveredCell: NSView?
+    private var windows: [WindowModel] = []
+    private var thumbnailImages: [String: NSImage] = [:]
+    private var previewTask: Task<Void, Never>?
+    private let selectionPreview = WindowPreviewPanel()
+    private var initialMouseLocation = NSEvent.mouseLocation
+    #if DEBUG
+    private(set) var loadedThumbnailCount = 0
+    #endif
 
     override var isFlipped: Bool { true }
 
@@ -34,6 +42,11 @@ final class SwitcherGridView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("not implemented") }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { dismissSelectionPreview() }
+    }
 
     // MARK: - Metrics (pure, deterministic)
 
@@ -49,6 +62,22 @@ final class SwitcherGridView: NSView {
         mode == .icons ? 96 : thumbnailSize.thumbnailHeight + 30
     }
 
+    /// The capture keeps the source window's aspect ratio. Windows with a
+    /// portrait layout therefore get a taller card than landscape windows.
+    func thumbnailDimensions(for window: WindowModel) -> CGSize {
+        let source = window.frame.size
+        guard source.width > 1, source.height > 1 else {
+            return CGSize(width: cardWidth, height: thumbnailSize.thumbnailHeight)
+        }
+        return WindowPreviewGeometry.fittedSize(source: source,
+                                                bounds: CGSize(width: cardWidth, height: cardWidth * 1.25))
+    }
+
+    func cardHeight(for index: Int) -> CGFloat {
+        guard mode == .thumbnails, windows.indices.contains(index) else { return cardHeight }
+        return thumbnailDimensions(for: windows[index]).height + 30
+    }
+
     /// Width needed to show `gridColumns` columns.
     var preferredWidth: CGFloat {
         Self.width(for: mode, thumbnailSize: thumbnailSize)
@@ -61,10 +90,38 @@ final class SwitcherGridView: NSView {
 
     func rowHeight() -> CGFloat { cardHeight + Self.gridGap }
 
+    private func rowHeight(for row: Int) -> CGFloat {
+        let first = row * Self.gridColumns
+        let last = min(first + Self.gridColumns, windows.count)
+        guard first < last else { return cardHeight + Self.gridGap }
+        let tallest = (first..<last).map(cardHeight(for:)).max() ?? cardHeight
+        return tallest + Self.gridGap
+    }
+
     /// y offset (flipped coordinates) of the row containing `index`.
     func rowY(for index: Int) -> CGFloat {
         let row = index / Self.gridColumns
-        return Self.gridInset + CGFloat(row) * rowHeight()
+        var y = Self.gridInset
+        for previousRow in 0..<row { y += rowHeight(for: previousRow) }
+        return y
+    }
+
+    /// Full document height, including rows that are below the visible clip.
+    var documentHeight: CGFloat {
+        guard !windows.isEmpty else { return 56 }
+        let rows = (windows.count + Self.gridColumns - 1) / Self.gridColumns
+        var height = Self.gridInset
+        for row in 0..<rows { height += rowHeight(for: row) }
+        return height
+    }
+
+    /// Height used by the panel before scrolling begins.
+    var visibleDocumentHeight: CGFloat {
+        guard !windows.isEmpty else { return 56 }
+        let rows = min((windows.count + Self.gridColumns - 1) / Self.gridColumns, 2)
+        var height = Self.gridInset
+        for row in 0..<rows { height += rowHeight(for: row) }
+        return height
     }
 
     static func visibleHeight(for mode: Mode, thumbnailSize: AppSettings.ThumbnailSize, itemCount: Int) -> CGFloat {
@@ -83,15 +140,21 @@ final class SwitcherGridView: NSView {
         mode = newMode
         thumbnailSize = newSize
 
-        let signature = viewModel.hits.map { $0.window.key }.joined(separator: ",")
-            + "|\(mode == .icons ? "i" : "t")|\(thumbnailSize.rawValue)"
+        let signature = viewModel.hits.map { "\($0.window.key):\($0.window.windowTitle):\($0.window.isMinimized):\($0.window.isFullscreen):\($0.window.frame.width)x\($0.window.frame.height)" }.joined(separator: ",")
+            + "|\(mode == .icons ? "i" : "t")|\(thumbnailSize.rawValue)|\(ScreenCapturePermission.isGranted)"
         if signature == lastSignature {
             refreshAllSelections(selected: viewModel.selectedIndex)
             return
         }
         lastSignature = signature
 
+        dismissSelectionPreview()
         cancelAllTasks()
+        windows = viewModel.hits.map(\.window)
+        thumbnailImages.removeAll()
+        #if DEBUG
+        loadedThumbnailCount = 0
+        #endif
         cells.forEach { $0.removeFromSuperview() }
         cells.removeAll()
         hoveredCell = nil
@@ -188,6 +251,11 @@ final class SwitcherGridView: NSView {
 
         thumbnailContainer.addSubview(thumbnailView)
         thumbnailContainer.addSubview(placeholderView)
+        let placeholderLabel = makeLabel(ScreenCapturePermission.isGranted ? L10n.switcherPreviewLoading : L10n.switcherScreenCaptureNeeded,
+                                         font: DS.fontCaption, color: DS.textTertiary)
+        placeholderLabel.alignment = .center
+        placeholderLabel.maximumNumberOfLines = 2
+        thumbnailContainer.addSubview(placeholderLabel)
 
         let title = window.windowTitle.isEmpty ? window.appName : window.windowTitle
         let titleLabel = makeLabel(title, font: DS.fontCaption, color: DS.textPrimary)
@@ -227,15 +295,18 @@ final class SwitcherGridView: NSView {
             thumbnailContainer.topAnchor.constraint(equalTo: cell.topAnchor),
             thumbnailContainer.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
             thumbnailContainer.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
-            thumbnailContainer.heightAnchor.constraint(equalToConstant: thumbnailSize.thumbnailHeight),
+            thumbnailContainer.heightAnchor.constraint(equalToConstant: thumbnailDimensions(for: window).height),
             thumbnailView.topAnchor.constraint(equalTo: thumbnailContainer.topAnchor),
             thumbnailView.bottomAnchor.constraint(equalTo: thumbnailContainer.bottomAnchor),
             thumbnailView.leadingAnchor.constraint(equalTo: thumbnailContainer.leadingAnchor),
             thumbnailView.trailingAnchor.constraint(equalTo: thumbnailContainer.trailingAnchor),
             placeholderView.centerXAnchor.constraint(equalTo: thumbnailContainer.centerXAnchor),
-            placeholderView.centerYAnchor.constraint(equalTo: thumbnailContainer.centerYAnchor),
+            placeholderView.centerYAnchor.constraint(equalTo: thumbnailContainer.centerYAnchor, constant: -10),
             placeholderView.widthAnchor.constraint(equalToConstant: 44),
             placeholderView.heightAnchor.constraint(equalToConstant: 44),
+            placeholderLabel.topAnchor.constraint(equalTo: placeholderView.bottomAnchor, constant: 3),
+            placeholderLabel.leadingAnchor.constraint(equalTo: thumbnailContainer.leadingAnchor, constant: 6),
+            placeholderLabel.trailingAnchor.constraint(equalTo: thumbnailContainer.trailingAnchor, constant: -6),
             badgeStack.topAnchor.constraint(equalTo: thumbnailContainer.topAnchor, constant: 6),
             badgeStack.leadingAnchor.constraint(equalTo: thumbnailContainer.leadingAnchor, constant: 6),
             iconView.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
@@ -252,16 +323,30 @@ final class SwitcherGridView: NSView {
 
         // Async capture; cancelled when cells are rebuilt.
         let cellID = ObjectIdentifier(cell)
-        let size = CGSize(width: thumbnailSize.cardWidth, height: thumbnailSize.thumbnailHeight)
-        let task = Task { [weak self, weak thumbnailView, weak placeholderView] in
-            let image = await ThumbnailProvider.shared.thumbnail(for: window, size: size)
+        let size = thumbnailDimensions(for: window)
+        let task = Task { [weak self, weak thumbnailView, weak placeholderView, weak placeholderLabel] in
+            var image: NSImage?
+            for attempt in 0..<3 {
+                if attempt > 0 { try? await Task.sleep(nanoseconds: 700_000_000) }
+                guard !Task.isCancelled else { return }
+                image = await ThumbnailProvider.shared.thumbnail(for: window, size: size)
+                if image != nil || !ScreenCapturePermission.isGranted { break }
+            }
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let thumbnailView, self?.tasks[cellID] != nil else { return }
                 if let image {
+                    self?.thumbnailImages[window.key] = image
+                    #if DEBUG
+                    self?.loadedThumbnailCount += 1
+                    #endif
                     thumbnailView.image = image
                     thumbnailView.isHidden = false
                     placeholderView?.isHidden = true
+                    placeholderLabel?.isHidden = true
+                } else {
+                    placeholderLabel?.stringValue = ScreenCapturePermission.isGranted
+                        ? L10n.switcherPreviewUnavailable : L10n.switcherScreenCaptureNeeded
                 }
             }
         }
@@ -275,11 +360,12 @@ final class SwitcherGridView: NSView {
         guard !cells.isEmpty else { return }
         if cells.count == 1, cells[0] is NSTextField { return } // centered by constraints
         for (index, cell) in cells.enumerated() {
-            let row = index / Self.gridColumns
             let column = index % Self.gridColumns
-            let x = Self.gridInset + CGFloat(column) * (cardWidth + Self.gridGap)
-            let y = Self.gridInset + CGFloat(row) * rowHeight()
-            cell.frame = NSRect(x: x, y: y, width: cardWidth, height: cardHeight)
+            let width = mode == .thumbnails && windows.indices.contains(index)
+                ? thumbnailDimensions(for: windows[index]).width : cardWidth
+            let x = Self.gridInset + CGFloat(column) * (cardWidth + Self.gridGap) + (cardWidth - width) / 2
+            let y = rowY(for: index)
+            cell.frame = NSRect(x: x, y: y, width: width, height: cardHeight(for: index))
         }
     }
 
@@ -326,25 +412,40 @@ final class SwitcherGridView: NSView {
     private func attachGestures(to cell: NSView, index: Int) {
         cell.identifier = NSUserInterfaceItemIdentifier(String(index))
         let area = NSTrackingArea(rect: .zero,
-                                  options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                  options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
                                   owner: self,
-                                  userInfo: ["cell": cell])
+                                  userInfo: ["index": index])
         cell.addTrackingArea(area)
         let click = NSClickGestureRecognizer(target: self, action: #selector(cellClicked(_:)))
         cell.addGestureRecognizer(click)
     }
 
     override func mouseEntered(with event: NSEvent) {
-        guard let cell = event.trackingArea?.userInfo?["cell"] as? NSView,
-              let index = cell.identifier.flatMap({ Int($0.rawValue) }) else { return }
+        handleHover(event)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        handleHover(event)
+    }
+
+    private func handleHover(_ event: NSEvent) {
+        guard NSEvent.mouseLocation != initialMouseLocation else { return }
+        guard let index = event.trackingArea?.userInfo?["index"] as? Int,
+              cells.indices.contains(index) else { return }
+        let cell = cells[index]
+        guard cell.trackingAreas.contains(where: { $0 === event.trackingArea }) else { return }
+        guard hoveredCell !== cell else { return }
         hoveredCell = cell
         applyCellBackground(cell, selected: index == currentSelection, hover: true)
         onHoverIndex?(index)
     }
 
     override func mouseExited(with event: NSEvent) {
-        guard let cell = event.trackingArea?.userInfo?["cell"] as? NSView,
-              let index = cell.identifier.flatMap({ Int($0.rawValue) }) else { return }
+        guard let index = event.trackingArea?.userInfo?["index"] as? Int,
+              cells.indices.contains(index) else { return }
+        let cell = cells[index]
+        guard cell.trackingAreas.contains(where: { $0 === event.trackingArea }) else { return }
+        guard hoveredCell === cell else { return }
         hoveredCell = nil
         applyCellBackground(cell, selected: index == currentSelection, hover: false)
     }
@@ -359,4 +460,63 @@ final class SwitcherGridView: NSView {
         tasks.values.forEach { $0.cancel() }
         tasks.removeAll()
     }
+
+    func resetThumbnails() {
+        dismissSelectionPreview()
+        cancelAllTasks()
+        lastSignature = ""
+    }
+
+    func prepareForPresentation() {
+        initialMouseLocation = NSEvent.mouseLocation
+        hoveredCell = nil
+        dismissSelectionPreview()
+    }
+
+    /// Cancel the enlarged preview while the user is actively navigating.
+    func dismissSelectionPreview() {
+        previewTask?.cancel()
+        previewTask = nil
+        selectionPreview.dismiss()
+    }
+
+    /// Enlarge the currently selected window after a short pause. This is
+    /// driven by selection, not pointer hover, so keyboard browsing behaves
+    /// the same with or without a mouse nearby.
+    func scheduleSelectionPreview(index: Int, delay: UInt64 = 520_000_000) {
+        dismissSelectionPreview()
+        guard mode == .thumbnails, windows.indices.contains(index) else { return }
+        let model = windows[index]
+        previewTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delay)
+            guard !Task.isCancelled, let self,
+                  self.currentSelection == index,
+                  self.cells.indices.contains(index),
+                  let parent = self.window, parent.isVisible else { return }
+            let cell = self.cells[index]
+            let anchor = parent.convertToScreen(cell.convert(cell.bounds, to: nil))
+            let size = self.selectionPreview.show(window: model, image: self.thumbnailImages[model.key],
+                                                   anchor: anchor, parent: parent,
+                                                   cardSize: self.thumbnailDimensions(for: model))
+            let image = await ThumbnailProvider.shared.thumbnail(for: model, size: size)
+            guard !Task.isCancelled, self.currentSelection == index else { return }
+            self.selectionPreview.update(image: image)
+        }
+    }
+
+    #if DEBUG
+    func saveSelectionPreviewSnapshotForSelfTest() {
+        guard let content = selectionPreview.contentView, selectionPreview.isVisible else {
+            preconditionFailure("Selection preview was not shown")
+        }
+        precondition(selectionPreview.ignoresMouseEvents && !selectionPreview.canBecomeKey)
+        content.layoutSubtreeIfNeeded()
+        guard let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) else { return }
+        content.cacheDisplay(in: content.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "/tmp/sakura-selection-preview-selftest.png"))
+        print("SELFTEST selection-preview=passed size=\(Int(selectionPreview.frame.width))x\(Int(selectionPreview.frame.height)) mouseTransparent=true")
+        dismissSelectionPreview()
+        precondition(!selectionPreview.isVisible && selectionPreview.parent == nil)
+    }
+    #endif
 }

@@ -84,21 +84,31 @@ public struct AppSettings: Codable, Equatable {
     }
 
     public struct Hotkeys: Codable, Equatable {
-        public var globalSwitch: KeyCombo
-        public var inAppSwitch: KeyCombo
-
-        public init(globalSwitch: KeyCombo = KeyCombo(keyCode: UInt32(kVK_Tab), modifiers: KeyCombo.option),
-                    inAppSwitch: KeyCombo = KeyCombo(keyCode: UInt32(kVK_ANSI_Grave), modifiers: KeyCombo.option)) {
-            self.globalSwitch = globalSwitch
-            self.inAppSwitch = inAppSwitch
+        public enum ReleaseBehavior: String, Codable, CaseIterable, Identifiable {
+            case switchAndClose
+            case keepOpen
+            public var id: String { rawValue }
         }
 
-        private enum CodingKeys: String, CodingKey { case globalSwitch, inAppSwitch }
+        public var globalSwitch: KeyCombo
+        public var inAppSwitch: KeyCombo
+        public var releaseBehavior: ReleaseBehavior
+
+        public init(globalSwitch: KeyCombo = KeyCombo(keyCode: UInt32(kVK_Tab), modifiers: KeyCombo.option),
+                    inAppSwitch: KeyCombo = KeyCombo(keyCode: UInt32(kVK_ANSI_Grave), modifiers: KeyCombo.option),
+                    releaseBehavior: ReleaseBehavior = .switchAndClose) {
+            self.globalSwitch = globalSwitch
+            self.inAppSwitch = inAppSwitch
+            self.releaseBehavior = releaseBehavior
+        }
+
+        private enum CodingKeys: String, CodingKey { case globalSwitch, inAppSwitch, releaseBehavior }
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             self.globalSwitch = try c.decodeIfPresent(KeyCombo.self, forKey: .globalSwitch) ?? Hotkeys().globalSwitch
             self.inAppSwitch = try c.decodeIfPresent(KeyCombo.self, forKey: .inAppSwitch) ?? Hotkeys().inAppSwitch
+            self.releaseBehavior = try c.decodeIfPresent(ReleaseBehavior.self, forKey: .releaseBehavior) ?? .switchAndClose
         }
     }
 

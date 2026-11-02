@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   build:
-    name: swift build + swift test + unsigned .app
+    name: swift build + swift test + signed .app
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -32,7 +32,7 @@ jobs:
       - name: Test
         run: swift test
 
-      - name: Assemble unsigned .app
+      - name: Assemble ad-hoc signed .app
         run: bash scripts/build-app.sh 0.0.0-dev
 
       - name: Verify bundle structure
@@ -41,10 +41,12 @@ jobs:
           test -f build/SakuraSwitch.app/Contents/Info.plist
           test -f build/SakuraSwitch.app/Contents/Resources/AppIcon.icns
           plutil -lint build/SakuraSwitch.app/Contents/Info.plist
+          codesign --verify --strict --all-architectures build/SakuraSwitch.app
+          lipo build/SakuraSwitch.app/Contents/MacOS/SakuraSwitch -verify_arch arm64 x86_64
           file build/SakuraSwitch.app/Contents/MacOS/SakuraSwitch
 
       - name: Upload app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SakuraSwitch-unsigned
+          name: SakuraSwitch-ad-hoc-signed
           path: build/SakuraSwitch.app

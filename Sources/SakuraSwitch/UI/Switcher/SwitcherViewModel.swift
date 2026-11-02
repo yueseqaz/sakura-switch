@@ -16,13 +16,15 @@ final class SwitcherViewModel {
     private(set) var allWindows: [WindowModel] = []
     private(set) var hits: [SearchHit] = []
     private(set) var selectedIndex = 0
+    private(set) var focusedApplicationID: String?
+    private(set) var applicationGroups: [ApplicationWindowGroup] = []
+    var onChange: (() -> Void)?
     var searchText = "" {
         didSet { applyFilters(preserveSelection: true) }
     }
     private(set) var inAppMode = false
-    /// Carbon modifier mask of the hotkey that opened the panel (for
-    /// release-to-confirm). 0 when opened from the menu.
-    var triggerModifiers: UInt32 = 0
+    private var pendingSelectionIndex: Int?
+    private(set) var isRefreshing = false
 
     var selectedWindow: WindowModel? {
         guard selectedIndex < hits.count else { return nil }
@@ -37,7 +39,6 @@ final class SwitcherViewModel {
 
     // MARK: - Services
 
-    private let enumerator = WindowEnumerator()
     private let settings: SettingsStore
     private let mru: MRUStore
     private let searchMemory: SearchMemoryStore
@@ -54,20 +55,18 @@ final class SwitcherViewModel {
     /// Panel opened. Selects the second MRU entry (classic cmd-tab feel).
     func show(inApp: Bool) {
         inAppMode = inApp
+        focusedApplicationID = nil
         searchText = ""
-        triggerModifiers = hotkeyTriggerModifiers(inApp: inApp)
-        selectedIndex = min(1, max(0, allWindows.count - 1))
+        pendingSelectionIndex = 1
+        selectedIndex = 0
         applyFilters(preserveSelection: false)
         refreshAsync()
     }
 
-    private func hotkeyTriggerModifiers(inApp: Bool) -> UInt32 {
-        let combo = inApp ? settings.current.hotkeys.inAppSwitch : settings.current.hotkeys.globalSwitch
-        return combo.modifiers
-    }
-
     func cancel() {
-        // Nothing to persist; controller hides the panel.
+        refreshGeneration += 1
+        isRefreshing = false
+        pendingSelectionIndex = nil
     }
 
     /// Confirm the current selection. Returns the window to activate
@@ -85,8 +84,19 @@ final class SwitcherViewModel {
 
     // MARK: - Navigation
 
+    func focusApplication(_ id: String?) {
+        guard focusedApplicationID != id else { return }
+        focusedApplicationID = id
+        pendingSelectionIndex = nil
+        selectedIndex = 0
+        searchText = ""
+    }
+
     func moveSelection(_ delta: Int) {
-        guard !hits.isEmpty else { return }
+        guard !hits.isEmpty else {
+            if let pendingSelectionIndex { self.pendingSelectionIndex = pendingSelectionIndex + delta }
+            return
+        }
         let count = hits.count
         selectedIndex = ((selectedIndex + delta) % count + count) % count
     }
@@ -103,15 +113,14 @@ final class SwitcherViewModel {
     /// Returns true when the panel should refresh (window still exists).
     func perform(_ action: QuickAction) -> Bool {
         guard let window = selectedWindow else { return false }
-        let result: Bool
         switch action {
-        case .close: result = WindowActions.close(window)
-        case .minimize: result = WindowActions.minimize(window)
-        case .toggleFullscreen: result = WindowActions.toggleFullscreen(window)
-        case .quitApp: result = WindowActions.quitApp(window)
-        case .hideApp: result = WindowActions.hideApp(window)
-        case .reveal: result = WindowActions.revealInFinder(window)
-        case .settings: result = true
+        case .close: _ = WindowActions.close(window)
+        case .minimize: _ = WindowActions.minimize(window)
+        case .toggleFullscreen: _ = WindowActions.toggleFullscreen(window)
+        case .quitApp: _ = WindowActions.quitApp(window)
+        case .hideApp: _ = WindowActions.hideApp(window)
+        case .reveal: _ = WindowActions.revealInFinder(window)
+        case .settings: break
         }
         // Close/quit remove the window; others keep the panel open and refresh.
         if action == .close || action == .quitApp {
@@ -129,7 +138,7 @@ final class SwitcherViewModel {
         allWindows = windows
         inAppMode = false
         searchText = ""
-        triggerModifiers = 0
+        pendingSelectionIndex = nil
         selectedIndex = min(1, max(0, allWindows.count - 1))
         activeScreenID = SwitcherController.mouseScreenID()
         applyFilters(preserveSelection: false)
@@ -140,14 +149,16 @@ final class SwitcherViewModel {
 
     /// Background enumeration; the cache shows instantly on show().
     func refreshAsync() {
+        isRefreshing = true
         refreshGeneration += 1
         let generation = refreshGeneration
         let exclusions = Set(settings.current.excludedBundleIDs)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
-            let models = self.enumerator.enumerate(exclusions: exclusions)
+            let models = WindowEnumerator().enumerate(exclusions: exclusions)
             DispatchQueue.main.async {
                 guard generation == self.refreshGeneration else { return }
+                self.isRefreshing = false
                 self.merge(models: models)
             }
         }
@@ -196,17 +207,30 @@ final class SwitcherViewModel {
             windows = windows.filter { $0.screenID == activeID }
         }
 
+        applicationGroups = ApplicationWindowGroup.group(windows)
+        if let focusedApplicationID {
+            if let group = applicationGroups.first(where: { $0.id == focusedApplicationID }) {
+                windows = group.windows
+            } else {
+                self.focusedApplicationID = nil
+            }
+        }
+
         hits = SearchEngine.search(windows: windows,
                                    query: searchText,
                                    memory: searchMemory.memory,
                                    fuzzyEnabled: settings.search.fuzzyEnabled)
 
         // Restore selection by key, else clamp.
-        if let selectedKey,
+        if let pendingSelectionIndex, !hits.isEmpty {
+            selectedIndex = ((pendingSelectionIndex % hits.count) + hits.count) % hits.count
+            self.pendingSelectionIndex = nil
+        } else if let selectedKey,
            let index = hits.firstIndex(where: { $0.window.key == selectedKey }) {
             selectedIndex = index
         } else if selectedIndex >= hits.count {
             selectedIndex = max(0, hits.count - 1)
         }
+        onChange?()
     }
 }

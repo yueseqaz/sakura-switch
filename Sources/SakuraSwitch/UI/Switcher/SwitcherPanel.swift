@@ -11,6 +11,7 @@ final class SwitcherPanel: NSPanel {
                    backing: .buffered, defer: false)
 
         isFloatingPanel = true
+        acceptsMouseMovedEvents = true
         level = .floating
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         isOpaque = false

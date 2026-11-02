@@ -24,7 +24,7 @@ final class HotkeyCoordinator: ObservableObject {
 
         cancellable = settings.$settings
             .map { $0.hotkeys }
-            .removeDuplicates()
+            .removeDuplicates { $0.globalSwitch == $1.globalSwitch && $0.inAppSwitch == $1.inAppSwitch }
             .dropFirst()
             .sink { [weak self] _ in self?.reregisterAll() }
 
@@ -61,9 +61,9 @@ final class HotkeyCoordinator: ObservableObject {
     private func handleHotkey(_ id: String) {
         switch id {
         case Self.globalID:
-            SwitcherController.shared.toggleGlobal()
+            SwitcherController.shared.cycleFromHotkey(inApp: false, trigger: settings.current.hotkeys.globalSwitch)
         case Self.inAppID:
-            SwitcherController.shared.toggleInApp()
+            SwitcherController.shared.cycleFromHotkey(inApp: true, trigger: settings.current.hotkeys.inAppSwitch)
         default:
             break
         }

@@ -5,27 +5,66 @@ import SakuraSwitchCore
 /// deep links into System Settings, recheck, and the unsigned-app note.
 final class PermissionsTabViewController: SettingsTabViewController {
 
+    private var refreshTimer: Timer?
+    private var lastAccessibility: Bool?
+    private var lastScreenCapture: Bool?
+
     init() {
         super.init { Self.buildContent() }
     }
 
     required init?(coder: NSCoder) { fatalError("not implemented") }
 
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        refreshPermissions()
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshPermissions),
+                                               name: NSApplication.didBecomeActiveNotification, object: nil)
+        // Settings can remain visible while the user changes a system toggle.
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            self?.refreshPermissions()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
+    }
+
+    override func viewDidDisappear() {
+        super.viewDidDisappear()
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        NotificationCenter.default.removeObserver(self, name: NSApplication.didBecomeActiveNotification, object: nil)
+    }
+
+    @objc private func refreshPermissions() {
+        let accessibility = AccessibilityPermission.isGranted
+        let screenCapture = ScreenCapturePermission.isGranted
+        guard accessibility != lastAccessibility || screenCapture != lastScreenCapture else { return }
+        lastAccessibility = accessibility
+        lastScreenCapture = screenCapture
+        Log.permissions.info("Permission status: accessibility=\(accessibility), screenRecording=\(screenCapture)")
+        rebuild()
+    }
+
+    deinit {
+        refreshTimer?.invalidate()
+        NotificationCenter.default.removeObserver(self)
+    }
+
     private static func buildContent() -> [NSView] {
         let accessibilityCard = permissionCard(
             icon: "hand.raised",
             title: L10n.permissionAccessibility,
             purpose: L10n.permissionAccessibilityPurpose,
-            granted: AccessibilityPermission.isGranted,
-            onOpen: { AccessibilityPermission.openSystemSettings() }
+            isGranted: { AccessibilityPermission.isGranted },
+            onOpen: { AccessibilityPermission.requestAndOpenSystemSettings() }
         )
 
         let screenRecordingCard = permissionCard(
             icon: "camera",
             title: L10n.permissionScreenRecording,
             purpose: L10n.permissionScreenRecordingPurpose,
-            granted: ScreenCapturePermission.isGranted,
-            onOpen: { ScreenCapturePermission.openSystemSettings() }
+            isGranted: { ScreenCapturePermission.isGranted },
+            onOpen: { ScreenCapturePermission.requestAndOpenSystemSettings() }
         )
 
         return [
@@ -39,8 +78,9 @@ final class PermissionsTabViewController: SettingsTabViewController {
     private static func permissionCard(icon: String,
                                        title: String,
                                        purpose: String,
-                                       granted: Bool,
+                                       isGranted: @escaping () -> Bool,
                                        onOpen: @escaping () -> Void) -> NSView {
+        let granted = isGranted()
         let iconView = NSImageView(image: NSImage(systemSymbolName: icon, accessibilityDescription: title)!)
         iconView.contentTintColor = DS.textSecondary
         iconView.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -100,12 +140,7 @@ final class PermissionsTabViewController: SettingsTabViewController {
 
         // Recheck: re-evaluate and update the status controls in place.
         recheckButton.actionHandler = {
-            let nowGranted: Bool
-            if title == L10n.permissionAccessibility {
-                nowGranted = AccessibilityPermission.isGranted
-            } else {
-                nowGranted = ScreenCapturePermission.isGranted
-            }
+            let nowGranted = isGranted()
             statusIcon.image = NSImage(systemSymbolName: nowGranted ? "checkmark.circle.fill" : "xmark.circle",
                                        accessibilityDescription: nil)
             statusIcon.contentTintColor = nowGranted ? .systemGreen : DS.textTertiary
