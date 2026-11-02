@@ -54,7 +54,7 @@ jobs:
           test "$(cat VERSION)" = "$RELEASE_VERSION"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/SakuraSwitch.app/Contents/Info.plist)" = "$RELEASE_VERSION"
           codesign --verify --strict --all-architectures build/SakuraSwitch.app
-          lipo -verify_arch arm64 x86_64 build/SakuraSwitch.app/Contents/MacOS/SakuraSwitch
+          lipo build/SakuraSwitch.app/Contents/MacOS/SakuraSwitch -verify_arch arm64 x86_64
 
       - name: Extract release notes from CHANGELOG
         id: notes
