@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Carbon.HIToolbox
 import SakuraSwitchCore
 
 @MainActor
@@ -21,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         rebuildStatusMenu()
         Log.switcher.info("App finished launching")
+
 
         #if DEBUG
         if SelfTest.isRequested() {
