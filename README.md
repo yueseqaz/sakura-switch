@@ -7,10 +7,21 @@ keyboard-first navigation, wrapped in a native, frosted-glass UI.
 > 将窗口（而非应用）作为切换单位的 macOS 窗口切换器。按住 `⌥ Tab` 唤起，键入即搜，
 > 回车切换 —— 像原生系统的一部分。
 
-<!-- TODO: replace with real screenshots
-![Screenshot — thumbnail view](docs/images/screenshot-thumbnails.png)
-![Screenshot — title list](docs/images/screenshot-titles.png)
--->
+<p align="center">
+  <img src="docs/images/switcher-thumbnails-dark.png" alt="Sakura Switch — thumbnail view (dark)" width="720">
+</p>
+<p align="center">
+  <img src="docs/images/switcher-thumbnails-light.png" alt="Sakura Switch — thumbnail view (light)" width="720">
+</p>
+<p align="center">
+  <img src="docs/images/search-highlight.png" alt="Fuzzy search with match highlighting" width="560">
+</p>
+<p align="center">
+  <img src="docs/images/settings-dark.png" alt="Settings window (dark)" width="640">
+</p>
+
+*Frosted-glass switcher panel in dark & light appearances, live search with
+match highlighting, and the eight-tab settings window.*
 
 ## Features
 
